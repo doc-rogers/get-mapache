@@ -56,9 +56,9 @@ fi
 
 # Vite / Electron live in devDependencies — do not --omit=dev
 say "installing app deps (2–4 min, deprecation warnings are noise)"
-( cd "$HOME_DIR" && npm install --no-fund --no-audit --loglevel=error )
-say "installing Mac shell"
-( cd "$HOME_DIR/native/macos" && npm install --no-fund --no-audit --loglevel=error )
+( cd "$HOME_DIR" && npm install --no-fund --no-audit --loglevel=error --foreground-scripts )
+say "downloading Electron (~120MB) — this is the long quiet bit"
+( cd "$HOME_DIR/native/macos" && npm install --no-fund --no-audit --loglevel=info --foreground-scripts )
 
 cat > "$BIN_DIR/mapache" <<EOF
 #!/bin/sh
