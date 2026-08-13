@@ -4,7 +4,7 @@
 set -eu
 
 REPO="${MAPACHE_REPO:-https://github.com/doc-rogers/Mapache.git}"
-REF="${MAPACHE_REF:-heel-2026-08-12}"
+REF="${MAPACHE_REF:-glass-day-thread}"
 HOME_DIR="${MAPACHE_HOME:-$HOME/.mapache}"
 APPS_DIR="${MAPACHE_APPS:-$HOME/Applications}"
 BIN_DIR="${MAPACHE_BIN:-$HOME/.local/bin}"
@@ -45,25 +45,31 @@ say "pin $REF → $HOME_DIR"
 mkdir -p "$HOME_DIR" "$APPS_DIR" "$BIN_DIR"
 
 if [ -d "$HOME_DIR/.git" ]; then
-  say "updating existing checkout"
-  git -C "$HOME_DIR" fetch --depth 1 origin "refs/tags/$REF:refs/tags/$REF" 2>/dev/null \
-    || git -C "$HOME_DIR" fetch --depth 1 origin "$REF"
-  git -C "$HOME_DIR" checkout -qf "$REF"
+  say "updating existing checkout → $REF"
+  git -C "$HOME_DIR" config remote.origin.fetch '+refs/heads/*:refs/remotes/origin/*'
+  git -C "$HOME_DIR" fetch --depth 1 origin "$REF"
+  git -C "$HOME_DIR" checkout -qf "origin/$REF" 2>/dev/null \
+    || git -C "$HOME_DIR" checkout -qf "$REF"
 else
   rm -rf "$HOME_DIR"
   git clone --depth 1 --branch "$REF" "$REPO" "$HOME_DIR"
 fi
 
 # Vite / Electron live in devDependencies — do not --omit=dev
-say "installing app deps (2–4 min, deprecation warnings are noise)"
-( cd "$HOME_DIR" && npm install --no-fund --no-audit --loglevel=error --foreground-scripts )
-say "downloading Electron (~120MB) — this is the long quiet bit"
-( cd "$HOME_DIR/native/macos" && npm install --no-fund --no-audit --loglevel=info --foreground-scripts )
-# npm 11 allow-scripts can skip electron's postinstall — force the binary
+if [ ! -d "$HOME_DIR/node_modules/vite" ]; then
+  say "installing app deps (2–4 min, deprecation warnings are noise)"
+  ( cd "$HOME_DIR" && npm install --no-fund --no-audit --loglevel=error --foreground-scripts )
+else
+  say "deps already present — skip npm"
+fi
 if [ ! -d "$HOME_DIR/native/macos/node_modules/electron/dist/Electron.app" ]; then
+  say "downloading Electron (~120MB) — this is the long quiet bit"
+  ( cd "$HOME_DIR/native/macos" && npm install --no-fund --no-audit --loglevel=info --foreground-scripts )
   say "fetching Electron binary"
   ( cd "$HOME_DIR/native/macos" && npm approve-scripts electron 2>/dev/null || true )
   ( cd "$HOME_DIR/native/macos/node_modules/electron" && node install.js )
+else
+  say "Electron already present — skip"
 fi
 
 # Real Mac icon so Launchpad isn't a generic target
