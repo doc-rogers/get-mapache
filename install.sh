@@ -59,6 +59,32 @@ say "installing app deps (2–4 min, deprecation warnings are noise)"
 ( cd "$HOME_DIR" && npm install --no-fund --no-audit --loglevel=error --foreground-scripts )
 say "downloading Electron (~120MB) — this is the long quiet bit"
 ( cd "$HOME_DIR/native/macos" && npm install --no-fund --no-audit --loglevel=info --foreground-scripts )
+# npm 11 allow-scripts can skip electron's postinstall — force the binary
+if [ ! -d "$HOME_DIR/native/macos/node_modules/electron/dist/Electron.app" ]; then
+  say "fetching Electron binary"
+  ( cd "$HOME_DIR/native/macos" && npm approve-scripts electron 2>/dev/null || true )
+  ( cd "$HOME_DIR/native/macos/node_modules/electron" && node install.js )
+fi
+
+# Real Mac icon so Launchpad isn't a generic target
+if command -v sips >/dev/null 2>&1 && command -v iconutil >/dev/null 2>&1; then
+  ICONSET="$HOME_DIR/native/macos/Mapache.iconset"
+  rm -rf "$ICONSET"
+  mkdir -p "$ICONSET"
+  SRC="$HOME_DIR/native/macos/icon.png"
+  sips -z 16 16     "$SRC" --out "$ICONSET/icon_16x16.png" >/dev/null
+  sips -z 32 32     "$SRC" --out "$ICONSET/icon_16x16@2x.png" >/dev/null
+  sips -z 32 32     "$SRC" --out "$ICONSET/icon_32x32.png" >/dev/null
+  sips -z 64 64     "$SRC" --out "$ICONSET/icon_32x32@2x.png" >/dev/null
+  sips -z 128 128   "$SRC" --out "$ICONSET/icon_128x128.png" >/dev/null
+  sips -z 256 256   "$SRC" --out "$ICONSET/icon_128x128@2x.png" >/dev/null
+  sips -z 256 256   "$SRC" --out "$ICONSET/icon_256x256.png" >/dev/null
+  sips -z 512 512   "$SRC" --out "$ICONSET/icon_256x256@2x.png" >/dev/null
+  sips -z 512 512   "$SRC" --out "$ICONSET/icon_512x512.png" >/dev/null
+  sips -z 1024 1024 "$SRC" --out "$ICONSET/icon_512x512@2x.png" >/dev/null
+  iconutil -c icns "$ICONSET" -o "$HOME_DIR/native/macos/icon.icns" 2>/dev/null || true
+  rm -rf "$ICONSET"
+fi
 
 cat > "$BIN_DIR/mapache" <<EOF
 #!/bin/sh
@@ -85,6 +111,9 @@ APP="$APPS_DIR/Mapaché.app"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$HOME_DIR/native/macos/icon.png" "$APP/Contents/Resources/icon.png" 2>/dev/null || true
+if [ -f "$HOME_DIR/native/macos/icon.icns" ]; then
+  cp "$HOME_DIR/native/macos/icon.icns" "$APP/Contents/Resources/AppIcon.icns"
+fi
 cat > "$APP/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -97,6 +126,7 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
   <key>CFBundleShortVersionString</key><string>0.4.0</string>
   <key>CFBundleExecutable</key><string>Mapache</string>
   <key>CFBundlePackageType</key><string>APPL</string>
+  <key>CFBundleIconFile</key><string>AppIcon</string>
   <key>LSMinimumSystemVersion</key><string>13.0</string>
   <key>NSHighResolutionCapable</key><true/>
 </dict>
@@ -109,6 +139,12 @@ exec "${BIN_DIR}/mapache"
 EOF
 chmod +x "$APP/Contents/MacOS/Mapache"
 xattr -cr "$APP" 2>/dev/null || true
+
+# Launchpad / Spotlight look here first
+if [ -w /Applications ]; then
+  rm -rf "/Applications/Mapaché.app"
+  ln -sfn "$APP" "/Applications/Mapaché.app" 2>/dev/null || true
+fi
 
 say "installed"
 say "  app  $APP"
