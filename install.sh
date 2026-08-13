@@ -1,6 +1,6 @@
 #!/bin/sh
 # Mapaché — one-line install
-#   curl -fsSL https://raw.githubusercontent.com/doc-rogers/Mapache/heel-2026-08-12/scripts/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/doc-rogers/get-mapache/main/install.sh | sh
 set -eu
 
 REPO="${MAPACHE_REPO:-https://github.com/doc-rogers/Mapache.git}"
@@ -15,9 +15,11 @@ die() { printf 'mapache: %s\n' "$*" >&2; exit 1; }
 os="$(uname -s)"
 [ "$os" = Darwin ] || die "this installer is for macOS (got $os)"
 
-# Prefer Homebrew's node if present
-PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
+PATH="/opt/homebrew/bin:/usr/local/bin:$HOME/.local/bin:$PATH"
 export PATH
+export GIT_CONFIG_COUNT=1
+export GIT_CONFIG_KEY_0=advice.detachedHead
+export GIT_CONFIG_VALUE_0=false
 
 need_cmd() { command -v "$1" >/dev/null 2>&1; }
 
@@ -46,31 +48,32 @@ if [ -d "$HOME_DIR/.git" ]; then
   say "updating existing checkout"
   git -C "$HOME_DIR" fetch --depth 1 origin "refs/tags/$REF:refs/tags/$REF" 2>/dev/null \
     || git -C "$HOME_DIR" fetch --depth 1 origin "$REF"
-  git -C "$HOME_DIR" checkout -f "$REF"
+  git -C "$HOME_DIR" checkout -qf "$REF"
 else
   rm -rf "$HOME_DIR"
   git clone --depth 1 --branch "$REF" "$REPO" "$HOME_DIR"
 fi
 
-say "installing JS deps (first run takes a minute)"
-( cd "$HOME_DIR" && npm install --omit=dev --no-fund --no-audit )
-( cd "$HOME_DIR/native/macos" && npm install --no-fund --no-audit )
+# Vite / Electron live in devDependencies — do not --omit=dev
+say "installing app deps (2–4 min, deprecation warnings are noise)"
+( cd "$HOME_DIR" && npm install --no-fund --no-audit --loglevel=error )
+say "installing Mac shell"
+( cd "$HOME_DIR/native/macos" && npm install --no-fund --no-audit --loglevel=error )
 
-# CLI
 cat > "$BIN_DIR/mapache" <<EOF
 #!/bin/sh
 set -eu
 export MAPACHE_HOME="${HOME_DIR}"
-export PATH="/opt/homebrew/bin:/usr/local/bin:\$PATH"
+export PATH="/opt/homebrew/bin:/usr/local/bin:\$HOME/.local/bin:\$PATH"
 cd "\$MAPACHE_HOME"
 if ! curl -sf -o /dev/null --max-time 1 http://127.0.0.1:8080/; then
   nohup npm run dev >>"\$MAPACHE_HOME/mapache.log" 2>&1 &
   echo \$! > "\$MAPACHE_HOME/mapache.pid"
   i=0
-  while [ \$i -lt 80 ]; do
+  while [ \$i -lt 120 ]; do
     curl -sf -o /dev/null --max-time 1 http://127.0.0.1:8080/ && break
     i=\$((i + 1))
-    sleep 0.4
+    sleep 0.5
   done
 fi
 cd "\$MAPACHE_HOME/native/macos"
@@ -78,7 +81,6 @@ exec npx electron .
 EOF
 chmod +x "$BIN_DIR/mapache"
 
-# Minimal .app so it lives in Applications / Spotlight
 APP="$APPS_DIR/Mapaché.app"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
@@ -96,7 +98,6 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
   <key>CFBundleExecutable</key><string>Mapache</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>LSMinimumSystemVersion</key><string>13.0</string>
-  <key>LSUIElement</key><false/>
   <key>NSHighResolutionCapable</key><true/>
 </dict>
 </plist>
@@ -113,11 +114,7 @@ say "installed"
 say "  app  $APP"
 say "  cli  $BIN_DIR/mapache"
 say "  src  $HOME_DIR  ($REF)"
-if ! echo ":$PATH:" | grep -q ":$BIN_DIR:"; then
-  say "add $BIN_DIR to PATH if you want the \`mapache\` command"
-fi
 
-# Launch unless MAPACHE_NO_OPEN=1
 if [ "${MAPACHE_NO_OPEN:-}" != "1" ]; then
   say "opening Mapaché"
   open "$APP" || "$BIN_DIR/mapache" &
