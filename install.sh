@@ -55,6 +55,15 @@ else
   git clone --depth 1 --branch "$REF" "$REPO" "$HOME_DIR"
 fi
 
+# Don't keep a stale Vite from the previous pin
+if [ -f "$HOME_DIR/mapache.pid" ]; then
+  kill "$(cat "$HOME_DIR/mapache.pid")" 2>/dev/null || true
+  rm -f "$HOME_DIR/mapache.pid"
+fi
+if command -v lsof >/dev/null 2>&1; then
+  lsof -tiTCP:8080 -sTCP:LISTEN 2>/dev/null | xargs kill 2>/dev/null || true
+fi
+
 # Vite / Electron live in devDependencies — do not --omit=dev
 if [ ! -d "$HOME_DIR/node_modules/vite" ]; then
   say "installing app deps (2–4 min, deprecation warnings are noise)"
@@ -139,8 +148,8 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
   <key>CFBundleName</key><string>Mapaché</string>
   <key>CFBundleDisplayName</key><string>Mapaché</string>
   <key>CFBundleIdentifier</key><string>life.trashpanda.mapache</string>
-  <key>CFBundleVersion</key><string>0.4.0</string>
-  <key>CFBundleShortVersionString</key><string>0.4.0</string>
+  <key>CFBundleVersion</key><string>0.5.0</string>
+  <key>CFBundleShortVersionString</key><string>0.5.0</string>
   <key>CFBundleExecutable</key><string>Mapache</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleIconFile</key><string>AppIcon</string>
