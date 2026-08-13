@@ -4,7 +4,7 @@
 set -eu
 
 REPO="${MAPACHE_REPO:-https://github.com/doc-rogers/Mapache.git}"
-REF="${MAPACHE_REF:-glass-day-thread}"
+REF="${MAPACHE_REF:-main}"
 HOME_DIR="${MAPACHE_HOME:-$HOME/.mapache}"
 APPS_DIR="${MAPACHE_APPS:-$HOME/Applications}"
 BIN_DIR="${MAPACHE_BIN:-$HOME/.local/bin}"
