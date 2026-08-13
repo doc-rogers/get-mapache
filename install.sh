@@ -86,14 +86,26 @@ if command -v sips >/dev/null 2>&1 && command -v iconutil >/dev/null 2>&1; then
   rm -rf "$ICONSET"
 fi
 
+NODE_BIN="$(command -v node)"
+NPM_BIN="$(command -v npm)"
+ELECTRON_BIN="$HOME_DIR/native/macos/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron"
+
+# Don't let stock Electron.app show up in Launchpad
+STOCK_PLIST="$HOME_DIR/native/macos/node_modules/electron/dist/Electron.app/Contents/Info.plist"
+if [ -f "$STOCK_PLIST" ]; then
+  /usr/libexec/PlistBuddy -c "Set :LSUIElement true" "$STOCK_PLIST" 2>/dev/null \
+    || /usr/libexec/PlistBuddy -c "Add :LSUIElement bool true" "$STOCK_PLIST" 2>/dev/null \
+    || true
+fi
+
 cat > "$BIN_DIR/mapache" <<EOF
 #!/bin/sh
 set -eu
 export MAPACHE_HOME="${HOME_DIR}"
-export PATH="/opt/homebrew/bin:/usr/local/bin:\$HOME/.local/bin:\$PATH"
+export PATH="$(dirname "$NODE_BIN"):/opt/homebrew/bin:/usr/local/bin:\$HOME/.local/bin:\$PATH"
 cd "\$MAPACHE_HOME"
 if ! curl -sf -o /dev/null --max-time 1 http://127.0.0.1:8080/; then
-  nohup npm run dev >>"\$MAPACHE_HOME/mapache.log" 2>&1 &
+  nohup "${NPM_BIN}" run dev >>"\$MAPACHE_HOME/mapache.log" 2>&1 &
   echo \$! > "\$MAPACHE_HOME/mapache.pid"
   i=0
   while [ \$i -lt 120 ]; do
@@ -102,8 +114,7 @@ if ! curl -sf -o /dev/null --max-time 1 http://127.0.0.1:8080/; then
     sleep 0.5
   done
 fi
-cd "\$MAPACHE_HOME/native/macos"
-exec npx electron .
+exec "${ELECTRON_BIN}" "\$MAPACHE_HOME/native/macos"
 EOF
 chmod +x "$BIN_DIR/mapache"
 
